@@ -6,7 +6,7 @@ export interface QsoLogQuery {
   pageSize: number
   callSign?: string
   mode?: string
-  country?: string
+  qth?: string
   startTime?: string
   endTime?: string
 }

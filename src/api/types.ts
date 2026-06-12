@@ -79,11 +79,9 @@ export interface QsoLog {
   rstSent?: string
   rstReceived?: string
   antenna?: string
-  country?: string
-  qthProvince?: string
-  qthCity?: string
-  qthDistrict?: string
-  qthDetail?: string
+  qth?: string
+  antennaHeight?: string
+  device?: string
   remark?: string
   qslCardExists?: boolean
   qslCardId?: number
@@ -103,12 +101,22 @@ export interface QsoLogPayload {
   rstSent?: string
   rstReceived?: string
   antenna?: string
-  country?: string
-  qthProvince?: string
-  qthCity?: string
-  qthDistrict?: string
-  qthDetail?: string
+  qth?: string
+  antennaHeight?: string
+  device?: string
   remark?: string
+}
+
+export interface DictItem {
+  id: number
+  dictId: number
+  itemCode: string
+  itemName: string
+  sortOrder: number
+  enabled: boolean
+  remark?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type CardType = '1' | '2'

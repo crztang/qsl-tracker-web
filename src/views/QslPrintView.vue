@@ -53,6 +53,7 @@ type FieldKey =
   | 'rstReceived'
   | 'antenna'
   | 'qth'
+  | 'device'
   | 'contactName'
   | 'contactAddress'
   | 'postalCode'
@@ -220,6 +221,7 @@ function defaultTemplate(type: PrintTemplateType = '1'): PrintTemplate {
         { key: 'rstReceived', label: '接收 RST', x: 31, y: 66, fontSize: 14, visible: false },
         { key: 'antenna', label: '天线', x: 70, y: 66, fontSize: 14, visible: false },
         { key: 'qth', label: 'QTH', x: 8, y: 81, fontSize: 12, visible: false },
+        { key: 'device', label: '设备', x: 45, y: 81, fontSize: 12, visible: false },
         { key: 'remark', label: '备注', x: 8, y: 81, fontSize: 12, visible: false },
         { key: 'qrCode', label: '公开确认二维码', x: 76, y: 8, fontSize: 88, visible: false }
       ])
@@ -238,6 +240,7 @@ function defaultTemplate(type: PrintTemplateType = '1'): PrintTemplate {
       { key: 'rstSent', label: '发送 RST', x: 8, y: 66, fontSize: 14, visible: true },
       { key: 'rstReceived', label: '接收 RST', x: 31, y: 66, fontSize: 14, visible: true },
       { key: 'qth', label: 'QTH', x: 8, y: 81, fontSize: 12, visible: true },
+      { key: 'device', label: '设备', x: 45, y: 81, fontSize: 12, visible: false },
       { key: 'powerW', label: '功率', x: 70, y: 51, fontSize: 14, visible: false },
       { key: 'antenna', label: '天线', x: 70, y: 66, fontSize: 14, visible: false },
       { key: 'contactName', label: '联系人', x: 63, y: 12, fontSize: 14, visible: false },
@@ -277,7 +280,8 @@ function fieldValue(key: FieldKey) {
     rstSent: qso?.rstSent || '-',
     rstReceived: qso?.rstReceived || '-',
     antenna: qso?.antenna || '-',
-    qth: [qso?.country, qso?.qthProvince, qso?.qthCity, qso?.qthDistrict, qso?.qthDetail].filter(Boolean).join(' ') || '-',
+    qth: qso?.qth || '-',
+    device: qso?.device || '-',
     contactName: qsl?.contactName || '-',
     contactAddress: qsl?.contactAddress || '-',
     postalCode: qsl?.postalCode || '-',
