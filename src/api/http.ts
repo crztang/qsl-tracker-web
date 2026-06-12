@@ -23,6 +23,13 @@ http.interceptors.response.use(
     if (payload && typeof payload.code === 'number' && payload.code !== 0) {
       const message = payload.message || '请求失败，请稍后重试'
       showError(message)
+      if (payload.code === 403 && message === '请先修改初始密码') {
+        const auth = useAuthStore()
+        auth.requirePasswordChange()
+        if (router.currentRoute.value.path !== '/change-password') {
+          void router.replace('/change-password')
+        }
+      }
       return Promise.reject(new Error(message))
     }
     return response

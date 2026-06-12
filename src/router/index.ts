@@ -6,6 +6,8 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/qso-logs' },
     { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+    { path: '/register', component: () => import('@/views/RegisterView.vue'), meta: { public: true } },
+    { path: '/change-password', component: () => import('@/views/ChangePasswordView.vue') },
     { path: '/qso-logs', component: () => import('@/views/QsoLogsView.vue') },
     { path: '/qsl-cards', component: () => import('@/views/QslCardsView.vue') },
     { path: '/qsl-print', component: () => import('@/views/QslPrintView.vue') },
@@ -17,10 +19,17 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   auth.restore()
+
   if (!to.meta.public && !auth.isLoggedIn) {
     return '/login'
   }
-  if (to.path === '/login' && auth.isLoggedIn) {
+  if (auth.isLoggedIn && auth.mustChangePassword && to.path !== '/change-password') {
+    return '/change-password'
+  }
+  if (auth.isLoggedIn && !auth.mustChangePassword && to.path === '/change-password') {
+    return '/'
+  }
+  if ((to.path === '/login' || to.path === '/register') && auth.isLoggedIn) {
     return '/'
   }
 })

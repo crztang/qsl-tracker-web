@@ -16,6 +16,34 @@ export interface LoginResponse {
   tokenValue: string
   userId: number
   username: string
+  mustChangePassword: boolean
+}
+
+export interface CaptchaResponse {
+  captchaId: string
+  captchaImage: string
+  expiresIn: number
+}
+
+export interface LoginPayload {
+  username: string
+  password: string
+  captchaId: string
+  captchaCode: string
+}
+
+export interface RegisterPayload {
+  username: string
+  password: string
+  confirmPassword: string
+  captchaId: string
+  captchaCode: string
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }
 
 export interface UserProfile {

@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { LogIn, RefreshCw } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { RefreshCw, UserPlus } from 'lucide-vue-next'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { login } from '@/api/auth'
+import { register } from '@/api/auth'
 import { useCaptcha } from '@/composables/useCaptcha'
-import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const auth = useAuthStore()
-const username = ref('')
-const password = ref('')
+const form = reactive({
+  username: '',
+  password: '',
+  confirmPassword: ''
+})
 const loading = ref(false)
 const error = ref('')
 const {
@@ -18,22 +19,25 @@ const {
   captchaImage,
   captchaLoading,
   refreshCaptcha
-} = useCaptcha('login')
+} = useCaptcha('register')
 
 async function submit() {
-  loading.value = true
   error.value = ''
+  if (form.password !== form.confirmPassword) {
+    error.value = '两次输入的密码不一致'
+    await refreshCaptcha()
+    return
+  }
+  loading.value = true
   try {
-    const data = await login({
-      username: username.value,
-      password: password.value,
+    await register({
+      ...form,
       captchaId: captchaId.value,
       captchaCode: captchaCode.value
     })
-    auth.setAuth(data)
-    await router.replace(data.mustChangePassword ? '/change-password' : '/qso-logs')
+    await router.replace('/login')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '登录失败'
+    error.value = err instanceof Error ? err.message : '注册失败'
     await refreshCaptcha()
   } finally {
     loading.value = false
@@ -44,17 +48,38 @@ async function submit() {
 <template>
   <main class="login-page">
     <section class="login-card">
-      <h1>QSL Tracker</h1>
-      <p class="muted">登录后台管理系统</p>
+      <h1>创建账号</h1>
+      <p class="muted">注册后返回登录页自行登录</p>
       <form class="login-form" @submit.prevent="submit">
         <label class="field">
           <span>用户名</span>
-          <input v-model.trim="username" class="input" autocomplete="username" required />
+          <input v-model.trim="form.username" class="input" maxlength="64" autocomplete="username" required />
         </label>
         <label class="field">
           <span>密码</span>
-          <input v-model="password" class="input" type="password" autocomplete="current-password" required />
+          <input
+            v-model="form.password"
+            class="input"
+            type="password"
+            minlength="8"
+            maxlength="64"
+            autocomplete="new-password"
+            required
+          />
         </label>
+        <label class="field">
+          <span>确认密码</span>
+          <input
+            v-model="form.confirmPassword"
+            class="input"
+            type="password"
+            minlength="8"
+            maxlength="64"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <p class="form-hint">密码需为 8-64 位，并同时包含字母和数字。</p>
         <label class="field">
           <span>验证码</span>
           <div class="captcha-row">
@@ -73,12 +98,12 @@ async function submit() {
           </div>
         </label>
         <button class="button" type="submit" :disabled="loading || captchaLoading || !captchaId">
-          <LogIn :size="18" />
-          <span>{{ loading ? '登录中' : '登录' }}</span>
+          <UserPlus :size="18" />
+          <span>{{ loading ? '注册中' : '注册' }}</span>
         </button>
         <p v-if="error" class="error">{{ error }}</p>
       </form>
-      <p class="auth-switch">还没有账号？<RouterLink to="/register">立即注册</RouterLink></p>
+      <p class="auth-switch">已有账号？<RouterLink to="/login">返回登录</RouterLink></p>
     </section>
   </main>
 </template>
