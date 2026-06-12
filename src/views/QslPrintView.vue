@@ -109,8 +109,11 @@ const templateType = ref<PrintTemplateType>('1')
 const backgroundFileKey = ref<string | null>(null)
 const backgroundUrl = ref('')
 const isDefault = ref(false)
+const previewScale = ref(1)
+const previewBaseWidth = 900
 let templatesRequestId = 0
 let backgroundRequestId = 0
+let previewResizeObserver: ResizeObserver | null = null
 
 const isPrintMode = computed(() => Boolean(route.query.cardId || route.query.qsoLogId))
 const loading = computed(() => initializing.value
@@ -139,7 +142,8 @@ const isSenderField = computed(() => (
 const cardStyle = computed(() => ({
   '--card-width': `${template.widthMm}mm`,
   '--card-height': `${template.heightMm}mm`,
-  '--card-ratio': `${template.widthMm} / ${template.heightMm}`
+  '--card-ratio': `${template.widthMm} / ${template.heightMm}`,
+  '--preview-scale': `${previewScale.value}`
 }))
 const qrContent = computed(() => {
   if (!isPrintMode.value) {
@@ -301,8 +305,8 @@ function fieldStyle(field: PrintField) {
     top: `${field.y}%`,
     width: field.width ? `${field.width}%` : undefined,
     height: field.height ? `${field.height}%` : undefined,
-    fontSize: field.key === 'qrCode' ? '12px' : `${field.fontSize}px`,
-    letterSpacing: field.charSpacing ? `${field.charSpacing}px` : undefined
+    '--field-font-size': `${field.fontSize}px`,
+    '--field-char-spacing': `${field.charSpacing || 0}px`
   }
 }
 
@@ -773,6 +777,13 @@ function clearBackgroundUrl() {
   backgroundUrl.value = ''
 }
 
+function syncPreviewScale() {
+  const element = cardElement.value
+  if (!element) return
+  const width = element.getBoundingClientRect().width
+  previewScale.value = width > 0 ? clamp(width / previewBaseWidth, 0.1, 1) : 1
+}
+
 function updatePrintPageStyle() {
   const id = 'qsl-dynamic-page-size'
   let style = document.getElementById(id) as HTMLStyleElement | null
@@ -841,6 +852,12 @@ onMounted(async () => {
   } finally {
     initializing.value = false
     scheduleFieldInteractionSync()
+    await nextTick()
+    syncPreviewScale()
+    previewResizeObserver = new ResizeObserver(() => syncPreviewScale())
+    if (cardElement.value) {
+      previewResizeObserver.observe(cardElement.value)
+    }
   }
 })
 
@@ -865,6 +882,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  previewResizeObserver?.disconnect()
+  previewResizeObserver = null
   for (const record of fieldInteractions.values()) {
     record.interactable?.unset?.()
   }
@@ -1047,7 +1066,7 @@ onBeforeUnmount(() => {
             @click.stop="selectField(field, $event)"
           >
             <span v-if="field.key === 'qrCode'" class="qr-field">
-              <img v-if="qrDataUrl" :src="qrDataUrl" :style="{ width: `${field.fontSize}px`, height: `${field.fontSize}px` }" alt="公开确认二维码" />
+              <img v-if="qrDataUrl" :src="qrDataUrl" alt="公开确认二维码" />
               <span v-else class="qr-empty">暂无追踪号</span>
               <strong v-if="template.qrHint">{{ template.qrHint }}</strong>
             </span>
@@ -1332,6 +1351,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid #111827;
   background: #fff;
+  --preview-scale: 1;
 }
 
 .preview-background {
@@ -1355,6 +1375,12 @@ onBeforeUnmount(() => {
   border: 1px solid transparent;
   background: transparent;
   color: #111827;
+  font-size: calc(var(--field-font-size, 12px) * var(--preview-scale, 1));
+  letter-spacing: calc(var(--field-char-spacing, 0px) * var(--preview-scale, 1));
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
   text-align: left;
   line-height: 1.1;
   white-space: nowrap;
@@ -1367,6 +1393,11 @@ onBeforeUnmount(() => {
 .print-field.selected {
   border-color: #6366f1;
   background: rgba(238, 242, 255, 0.78);
+}
+
+.print-field:focus,
+.print-field:focus-visible {
+  outline: none;
 }
 
 .print-field.wrap-field {
@@ -1456,16 +1487,19 @@ onBeforeUnmount(() => {
   display: grid;
   justify-items: center;
   gap: 4px;
+  font-size: calc(11px * var(--preview-scale, 1));
+  line-height: 1.25;
 }
 
 .qr-field img {
   display: block;
+  width: calc(var(--field-font-size, 88px) * var(--preview-scale, 1));
+  height: calc(var(--field-font-size, 88px) * var(--preview-scale, 1));
   max-width: none;
 }
 
 .qr-field strong {
   max-width: 140px;
-  font-size: 11px;
   font-weight: 500;
   line-height: 1.25;
   text-align: center;
@@ -1474,12 +1508,12 @@ onBeforeUnmount(() => {
 
 .qr-empty {
   display: grid;
-  width: 88px;
-  height: 88px;
+  width: calc(var(--field-font-size, 88px) * var(--preview-scale, 1));
+  height: calc(var(--field-font-size, 88px) * var(--preview-scale, 1));
   place-items: center;
   border: 1px dashed #9ca3af;
   color: #6b7280;
-  font-size: 11px;
+  font-size: calc(11px * var(--preview-scale, 1));
 }
 
 .preview-caption {
@@ -1649,6 +1683,7 @@ onBeforeUnmount(() => {
     margin: 0;
     border: 0;
     background: #fff;
+    --preview-scale: 1 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -1657,9 +1692,21 @@ onBeforeUnmount(() => {
   .print-field:hover,
   .print-field.selected {
     appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    box-shadow: none;
     padding: 0;
-    border-color: transparent;
+    border: 0 !important;
     background: transparent;
+  }
+
+  .print-field:focus,
+  .print-field:focus-visible {
+    outline: none !important;
+  }
+
+  .resize-handle {
+    display: none !important;
   }
 
 }
