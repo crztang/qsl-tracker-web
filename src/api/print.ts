@@ -34,7 +34,7 @@ export function uploadPrintBackground(file: File) {
   return unwrap<StorageFile>(http.post('/api/files/upload', form))
 }
 
-export async function getFileContent(id: number) {
-  const response = await http.get<Blob>(`/api/files/${id}/content`, { responseType: 'blob' })
+export async function getFileContent(fileKey: string) {
+  const response = await http.get<Blob>(`/api/files/${fileKey}/content`, { responseType: 'blob' })
   return response.data
 }

@@ -135,7 +135,7 @@ export interface PublicQslInfo {
 }
 
 export interface StorageFile {
-  id: number
+  fileKey: string
   originalName: string
   contentType: string
   fileSize: number
@@ -147,7 +147,7 @@ export interface PrintTemplate<T = unknown> {
   id: number
   templateName: string
   templateType: PrintTemplateType
-  backgroundFileId?: number | null
+  backgroundFileKey?: string | null
   configJson: T
   enabled: boolean
   isDefault: boolean
@@ -161,7 +161,7 @@ export interface PrintTemplatePayload<T = unknown> {
   id: number | null
   templateName: string
   templateType: PrintTemplateType
-  backgroundFileId?: number | null
+  backgroundFileKey?: string | null
   configJson: T
   enabled: boolean
   isDefault: boolean

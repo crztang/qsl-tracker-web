@@ -101,7 +101,7 @@ const templates = ref<SavedPrintTemplate<PrintTemplate>[]>([])
 const currentTemplateId = ref<number | null>(null)
 const templateName = ref('QSL 默认配置')
 const templateType = ref<PrintTemplateType>('1')
-const backgroundFileId = ref<number | null>(null)
+const backgroundFileKey = ref<string | null>(null)
 const backgroundUrl = ref('')
 const isDefault = ref(false)
 
@@ -572,7 +572,7 @@ async function saveTemplate() {
       id: currentTemplateId.value,
       templateName: templateName.value.trim(),
       templateType: templateType.value,
-      backgroundFileId: backgroundFileId.value,
+      backgroundFileKey: backgroundFileKey.value,
       configJson: JSON.parse(JSON.stringify(template)),
       enabled: true,
       isDefault: isDefault.value,
@@ -606,7 +606,7 @@ function printCard() {
 function newTemplate() {
   currentTemplateId.value = null
   templateName.value = templateType.value === '1' ? 'QSL 新配置' : '信封新配置'
-  backgroundFileId.value = null
+  backgroundFileKey.value = null
   isDefault.value = false
   clearBackgroundUrl()
   Object.assign(template, defaultTemplate(templateType.value))
@@ -641,7 +641,7 @@ async function selectTemplate(id: number) {
   currentTemplateId.value = selected.id
   templateName.value = selected.templateName
   templateType.value = selected.templateType
-  backgroundFileId.value = selected.backgroundFileId ?? null
+  backgroundFileKey.value = selected.backgroundFileKey ?? null
   isDefault.value = selected.isDefault
   applyTemplateConfig(selected.templateType, selected.configJson)
   await loadBackground()
@@ -705,7 +705,7 @@ async function uploadBackground(event: Event) {
   error.value = ''
   try {
     const result = await uploadPrintBackground(file)
-    backgroundFileId.value = result.id
+    backgroundFileKey.value = result.fileKey
     await loadBackground()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '背景图片上传失败'
@@ -716,9 +716,9 @@ async function uploadBackground(event: Event) {
 
 async function loadBackground() {
   clearBackgroundUrl()
-  if (!backgroundFileId.value) return
+  if (!backgroundFileKey.value) return
   try {
-    const blob = await getFileContent(backgroundFileId.value)
+    const blob = await getFileContent(backgroundFileKey.value)
     backgroundUrl.value = URL.createObjectURL(blob)
   } catch (err) {
     error.value = err instanceof Error ? err.message : '背景图片加载失败'
@@ -726,7 +726,7 @@ async function loadBackground() {
 }
 
 function removeBackground() {
-  backgroundFileId.value = null
+  backgroundFileKey.value = null
   clearBackgroundUrl()
 }
 
@@ -998,16 +998,14 @@ onBeforeUnmount(() => {
               <strong v-if="template.qrHint">{{ template.qrHint }}</strong>
             </span>
             <strong v-else>{{ fieldValue(field.key) }}</strong>
-            <template v-if="!isPrintMode">
-              <span class="resize-handle resize-handle-left" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-right" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-top" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-bottom" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-top-left" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-top-right" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-bottom-left" aria-hidden="true"></span>
-              <span class="resize-handle resize-handle-bottom-right" aria-hidden="true"></span>
-            </template>
+            <span class="resize-handle resize-handle-left" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-right" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-top" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-bottom" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-top-left" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-top-right" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-bottom-left" aria-hidden="true"></span>
+            <span class="resize-handle resize-handle-bottom-right" aria-hidden="true"></span>
           </button>
           <VueSelecto
             v-if="cardElement"
@@ -1089,7 +1087,7 @@ onBeforeUnmount(() => {
             />
           </label>
           <button
-            v-if="backgroundFileId"
+            v-if="backgroundFileKey"
             class="button secondary"
             type="button"
             @click="removeBackground"
