@@ -434,6 +434,38 @@ a {
   font-size: 13px;
 }
 
+.form-hint--error {
+  color: #dc2626;
+}
+
+.rule-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.rule-item svg {
+  flex: 0 0 auto;
+}
+
+.rule-item[data-ok="true"] {
+  color: #166534;
+}
+
+.rule-item[data-ok="true"] svg {
+  color: #16a34a;
+}
+
 .auth-switch {
   margin: 18px 0 0;
   text-align: center;
