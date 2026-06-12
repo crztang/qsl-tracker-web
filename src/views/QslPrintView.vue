@@ -39,6 +39,7 @@ import type {
   UserProfile
 } from '@/api/types'
 import AppShell from '@/components/AppShell.vue'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import PageHeader from '@/components/PageHeader.vue'
 
 type FieldKey =
@@ -87,7 +88,10 @@ const route = useRoute()
 const card = ref<QslCard | null>(null)
 const qsoLog = ref<QsoLog | null>(null)
 const userProfile = ref<UserProfile | null>(null)
-const loading = ref(false)
+const initializing = ref(true)
+const templatesLoading = ref(false)
+const printDataLoading = ref(false)
+const profileLoading = ref(false)
 const error = ref('')
 const saved = ref(false)
 const saving = ref(false)
@@ -104,8 +108,15 @@ const templateType = ref<PrintTemplateType>('1')
 const backgroundFileKey = ref<string | null>(null)
 const backgroundUrl = ref('')
 const isDefault = ref(false)
+let templatesRequestId = 0
+let backgroundRequestId = 0
 
 const isPrintMode = computed(() => Boolean(route.query.cardId || route.query.qsoLogId))
+const loading = computed(() => initializing.value
+  || templatesLoading.value
+  || printDataLoading.value
+  || profileLoading.value)
+const editorBusy = computed(() => initializing.value || templatesLoading.value)
 const pageTitle = computed(() => {
   if (!isPrintMode.value) return '打印配置'
   return templateType.value === '1' ? '打印 QSL 卡片' : '打印信封'
@@ -614,14 +625,18 @@ function newTemplate() {
 }
 
 async function loadTemplates(preferredId?: number) {
-  loading.value = true
+  const requestId = ++templatesRequestId
+  const requestedType = templateType.value
+  templatesLoading.value = true
   error.value = ''
   try {
-    templates.value = await listPrintTemplates(templateType.value) as SavedPrintTemplate<PrintTemplate>[]
-    const selected = templates.value.find((item) => item.id === preferredId)
-      || templates.value.find((item) => item.id === currentTemplateId.value)
-      || templates.value.find((item) => item.isDefault)
-      || templates.value[0]
+    const loadedTemplates = await listPrintTemplates(requestedType) as SavedPrintTemplate<PrintTemplate>[]
+    if (requestId !== templatesRequestId || requestedType !== templateType.value) return
+    templates.value = loadedTemplates
+    const selected = loadedTemplates.find((item) => item.id === preferredId)
+      || loadedTemplates.find((item) => item.id === currentTemplateId.value)
+      || loadedTemplates.find((item) => item.isDefault)
+      || loadedTemplates[0]
     if (selected) {
       await selectTemplate(selected.id)
     } else {
@@ -629,9 +644,14 @@ async function loadTemplates(preferredId?: number) {
     }
     scheduleFieldInteractionSync()
   } catch (err) {
+    if (requestId !== templatesRequestId) return
+    templates.value = []
+    newTemplate()
     error.value = err instanceof Error ? err.message : '打印配置加载失败'
   } finally {
-    loading.value = false
+    if (requestId === templatesRequestId) {
+      templatesLoading.value = false
+    }
   }
 }
 
@@ -664,10 +684,19 @@ function applyTemplateConfig(type: PrintTemplateType, config: PrintTemplate) {
   scheduleFieldInteractionSync()
 }
 
-function onTemplateSelect(event: Event) {
+async function onTemplateSelect(event: Event) {
+  if (templatesLoading.value) return
   const id = Number((event.target as HTMLSelectElement).value)
-  if (id) selectTemplate(id)
-  else newTemplate()
+  templatesLoading.value = true
+  error.value = ''
+  try {
+    if (id) await selectTemplate(id)
+    else newTemplate()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '打印配置加载失败'
+  } finally {
+    templatesLoading.value = false
+  }
 }
 
 async function changeTemplateType() {
@@ -715,17 +744,22 @@ async function uploadBackground(event: Event) {
 }
 
 async function loadBackground() {
+  const requestId = ++backgroundRequestId
+  const requestedFileKey = backgroundFileKey.value
   clearBackgroundUrl()
-  if (!backgroundFileKey.value) return
+  if (!requestedFileKey) return
   try {
-    const blob = await getFileContent(backgroundFileKey.value)
+    const blob = await getFileContent(requestedFileKey)
+    if (requestId !== backgroundRequestId || requestedFileKey !== backgroundFileKey.value) return
     backgroundUrl.value = URL.createObjectURL(blob)
   } catch (err) {
+    if (requestId !== backgroundRequestId) return
     error.value = err instanceof Error ? err.message : '背景图片加载失败'
   }
 }
 
 function removeBackground() {
+  backgroundRequestId += 1
   backgroundFileKey.value = null
   clearBackgroundUrl()
 }
@@ -767,7 +801,7 @@ async function loadData() {
   const cardId = Number(route.query.cardId)
   const routeQsoLogId = Number(route.query.qsoLogId)
   if (!cardId && !routeQsoLogId) return
-  loading.value = true
+  printDataLoading.value = true
   error.value = ''
   try {
     if (cardId) card.value = await getQslCard(cardId)
@@ -780,23 +814,30 @@ async function loadData() {
   } catch (err) {
     error.value = err instanceof Error ? err.message : '打印数据加载失败'
   } finally {
-    loading.value = false
+    printDataLoading.value = false
   }
 }
 
 async function loadUserProfile() {
   if (!isPrintMode.value) return
+  profileLoading.value = true
   try {
     userProfile.value = await getUserProfile()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '个人资料加载失败'
+  } finally {
+    profileLoading.value = false
   }
 }
 
 onMounted(async () => {
   document.body.classList.add('qsl-print-page')
-  await Promise.all([loadData(), loadTemplates(), loadUserProfile()])
-  scheduleFieldInteractionSync()
+  try {
+    await Promise.all([loadData(), loadTemplates(), loadUserProfile()])
+  } finally {
+    initializing.value = false
+    scheduleFieldInteractionSync()
+  }
 })
 
 watch(
@@ -833,15 +874,15 @@ onBeforeUnmount(() => {
 <template>
   <AppShell>
     <PageHeader :title="pageTitle" eyebrow="QSL PRINT">
-      <button class="button secondary" type="button" @click="newTemplate">
+      <button class="button secondary" type="button" :disabled="editorBusy" @click="newTemplate">
         <Plus :size="17" />
         <span>新建配置</span>
       </button>
-      <button class="button secondary" type="button" @click="resetTemplate">
+      <button class="button secondary" type="button" :disabled="editorBusy" @click="resetTemplate">
         <RotateCcw :size="17" />
         <span>恢复默认</span>
       </button>
-      <button class="button secondary" type="button" :disabled="saving" @click="saveTemplate">
+      <button class="button secondary" type="button" :disabled="editorBusy || saving" @click="saveTemplate">
         <Save :size="17" />
         <span>{{ saving ? '保存中' : saved ? '已保存' : '保存配置' }}</span>
       </button>
@@ -851,8 +892,17 @@ onBeforeUnmount(() => {
       </button>
     </PageHeader>
 
-    <p v-if="error" class="print-notice">{{ error }}</p>
-    <div class="print-layout">
+    <LoadingOverlay
+      v-if="initializing"
+      :active="true"
+      :overlay="false"
+      label="正在加载打印配置"
+    />
+    <Transition name="print-editor" appear>
+      <div v-if="!initializing" class="print-editor loading-host">
+        <div class="print-editor-content" :inert="editorBusy || undefined">
+          <p v-if="error" class="print-notice">{{ error }}</p>
+          <div class="print-layout">
       <section class="print-workspace">
         <div class="alignment-toolbar">
           <span class="selection-count">{{ selectedKeys.length }} 项已选择</span>
@@ -1145,12 +1195,27 @@ onBeforeUnmount(() => {
             </label>
           </div>
         </template>
-      </aside>
-    </div>
+            </aside>
+          </div>
+        </div>
+        <LoadingOverlay :active="templatesLoading" label="正在切换打印配置" />
+      </div>
+    </Transition>
   </AppShell>
 </template>
 
 <style scoped>
+.print-editor-enter-active,
+.print-editor-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.print-editor-enter-from,
+.print-editor-leave-to {
+  opacity: 0;
+  transform: translateY(5px);
+}
+
 .print-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -1519,6 +1584,11 @@ onBeforeUnmount(() => {
 }
 
 @media print {
+  .print-editor-enter-active,
+  .print-editor-leave-active {
+    transition: none;
+  }
+
   :global(body.qsl-print-page) {
     margin: 0;
     background: #fff;
@@ -1588,5 +1658,12 @@ onBeforeUnmount(() => {
     background: transparent;
   }
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .print-editor-enter-active,
+  .print-editor-leave-active {
+    transition: none;
+  }
 }
 </style>

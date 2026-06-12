@@ -116,6 +116,22 @@ a {
 .main {
   min-width: 0;
   padding: 32px;
+  animation: page-enter 0.16s ease-out both;
+}
+
+.loading-host {
+  position: relative;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-header {
@@ -528,5 +544,17 @@ a {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main {
+    animation: none;
+  }
+}
+
+@media print {
+  .main {
+    animation: none;
   }
 }

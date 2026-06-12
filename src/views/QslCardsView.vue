@@ -6,11 +6,13 @@ import { deleteQslCard, listQslCards, updateQslCard } from '@/api/qsl'
 import { listQsoLogs } from '@/api/qso'
 import type { CardStatus, CardType, PageResponse, QslCard, QslCardPayload, QsoLog } from '@/api/types'
 import AppShell from '@/components/AppShell.vue'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import SuccessToast from '@/components/SuccessToast.vue'
 
 const loading = ref(false)
+const hasLoaded = ref(false)
 const router = useRouter()
 const saving = ref(false)
 const drawerOpen = ref(false)
@@ -97,6 +99,7 @@ function selectQsoLog() {
 }
 
 async function fetchData() {
+  if (loading.value) return
   loading.value = true
   error.value = ''
   try {
@@ -106,6 +109,7 @@ async function fetchData() {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -173,27 +177,29 @@ onMounted(fetchData)
     <div class="stat-grid">
       <div class="stat">
         <span>当前页发出</span>
-        <strong>{{ sentCount }}</strong>
+        <strong>{{ hasLoaded ? sentCount : '—' }}</strong>
       </div>
       <div class="stat">
         <span>当前页收到</span>
-        <strong>{{ receivedCount }}</strong>
+        <strong>{{ hasLoaded ? receivedCount : '—' }}</strong>
       </div>
       <div class="stat">
         <span>当前页待发</span>
-        <strong>{{ pendingCount }}</strong>
+        <strong>{{ hasLoaded ? pendingCount : '—' }}</strong>
       </div>
     </div>
 
-    <section class="panel">
+    <section class="panel loading-host">
+      <LoadingOverlay v-if="!hasLoaded" :active="true" :overlay="false" label="正在加载 QSL 卡片" />
+      <template v-else>
       <div class="toolbar">
         <label class="field">
           <span>呼号</span>
-          <input v-model.trim="query.callSign" class="input" />
+          <input v-model.trim="query.callSign" class="input" :disabled="loading" />
         </label>
         <label class="field">
           <span>类型</span>
-          <select v-model="query.cardType" class="select">
+          <select v-model="query.cardType" class="select" :disabled="loading">
             <option value="">全部</option>
             <option value="1">发出</option>
             <option value="2">收到</option>
@@ -201,7 +207,7 @@ onMounted(fetchData)
         </label>
         <label class="field">
           <span>状态</span>
-          <select v-model="query.status" class="select">
+          <select v-model="query.status" class="select" :disabled="loading">
             <option value="">全部</option>
             <option value="1">待发出</option>
             <option value="2">已发出</option>
@@ -211,13 +217,13 @@ onMounted(fetchData)
         </label>
         <label class="field">
           <span>每页</span>
-          <select v-model.number="query.pageSize" class="select">
+          <select v-model.number="query.pageSize" class="select" :disabled="loading">
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
           </select>
         </label>
-        <button class="button secondary" type="button" @click="query.pageNo = 1; fetchData()">
+        <button class="button secondary" type="button" :disabled="loading" @click="query.pageNo = 1; fetchData()">
           <Search :size="18" />
           <span>查询</span>
         </button>
@@ -271,10 +277,12 @@ onMounted(fetchData)
       </div>
       <div class="pagination">
         <span class="muted">共 {{ page.total }} 条</span>
-        <button class="button secondary" type="button" :disabled="query.pageNo <= 1" @click="changePage(-1)">上一页</button>
+        <button class="button secondary" type="button" :disabled="loading || query.pageNo <= 1" @click="changePage(-1)">上一页</button>
         <span>{{ query.pageNo }} / {{ totalPages }}</span>
-        <button class="button secondary" type="button" :disabled="query.pageNo >= totalPages" @click="changePage(1)">下一页</button>
+        <button class="button secondary" type="button" :disabled="loading || query.pageNo >= totalPages" @click="changePage(1)">下一页</button>
       </div>
+      <LoadingOverlay :active="loading" label="正在加载 QSL 卡片" />
+      </template>
     </section>
     <p v-if="error" class="error">{{ error }}</p>
 

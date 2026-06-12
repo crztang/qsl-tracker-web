@@ -5,10 +5,12 @@ import { createQslCard } from '@/api/qsl'
 import { createQsoLog, deleteQsoLog, listQsoLogs, updateQsoLog } from '@/api/qso'
 import type { PageResponse, QslCardPayload, QsoLog, QsoLogPayload } from '@/api/types'
 import AppShell from '@/components/AppShell.vue'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SuccessToast from '@/components/SuccessToast.vue'
 
 const loading = ref(false)
+const hasLoaded = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
 const cardDrawerOpen = ref(false)
@@ -90,6 +92,7 @@ function fillForm(row?: QsoLog) {
 }
 
 async function fetchData() {
+  if (loading.value) return
   loading.value = true
   error.value = ''
   try {
@@ -99,6 +102,7 @@ async function fetchData() {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -168,29 +172,31 @@ onMounted(fetchData)
       </button>
     </PageHeader>
 
-    <section class="panel">
+    <section class="panel loading-host">
+      <LoadingOverlay v-if="!hasLoaded" :active="true" :overlay="false" label="正在加载通联日志" />
+      <template v-else>
       <div class="toolbar">
         <label class="field">
           <span>呼号</span>
-          <input v-model.trim="query.callSign" class="input" />
+          <input v-model.trim="query.callSign" class="input" :disabled="loading" />
         </label>
         <label class="field">
           <span>模式</span>
-          <input v-model.trim="query.mode" class="input" />
+          <input v-model.trim="query.mode" class="input" :disabled="loading" />
         </label>
         <label class="field">
           <span>国家或地区</span>
-          <input v-model.trim="query.country" class="input" />
+          <input v-model.trim="query.country" class="input" :disabled="loading" />
         </label>
         <label class="field">
           <span>每页</span>
-          <select v-model.number="query.pageSize" class="select">
+          <select v-model.number="query.pageSize" class="select" :disabled="loading">
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
           </select>
         </label>
-        <button class="button secondary" type="button" @click="query.pageNo = 1; fetchData()">
+        <button class="button secondary" type="button" :disabled="loading" @click="query.pageNo = 1; fetchData()">
           <Search :size="18" />
           <span>查询</span>
         </button>
@@ -248,10 +254,12 @@ onMounted(fetchData)
       </div>
       <div class="pagination">
         <span class="muted">共 {{ page.total }} 条</span>
-        <button class="button secondary" type="button" :disabled="query.pageNo <= 1" @click="changePage(-1)">上一页</button>
+        <button class="button secondary" type="button" :disabled="loading || query.pageNo <= 1" @click="changePage(-1)">上一页</button>
         <span>{{ query.pageNo }} / {{ totalPages }}</span>
-        <button class="button secondary" type="button" :disabled="query.pageNo >= totalPages" @click="changePage(1)">下一页</button>
+        <button class="button secondary" type="button" :disabled="loading || query.pageNo >= totalPages" @click="changePage(1)">下一页</button>
       </div>
+      <LoadingOverlay :active="loading" label="正在加载通联日志" />
+      </template>
     </section>
     <p v-if="error" class="error">{{ error }}</p>
 
