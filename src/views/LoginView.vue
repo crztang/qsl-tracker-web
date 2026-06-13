@@ -17,10 +17,15 @@ const {
   captchaCode,
   captchaImage,
   captchaLoading,
+  captchaExpired,
   refreshCaptcha
 } = useCaptcha('login')
 
 async function submit() {
+  if (!captchaId.value || captchaExpired.value) {
+    error.value = '请先获取验证码'
+    return
+  }
   loading.value = true
   error.value = ''
   try {
@@ -66,8 +71,18 @@ async function submit() {
               placeholder="请输入验证码"
               required
             />
-            <button class="captcha-image" type="button" :disabled="captchaLoading" @click="refreshCaptcha">
+            <button
+              class="captcha-image"
+              :class="{ 'captcha-image--expired': captchaExpired }"
+              type="button"
+              :disabled="captchaLoading"
+              :aria-label="captchaExpired ? '点击刷新' : '点击刷新'"
+              @click="refreshCaptcha"
+            >
               <img v-if="captchaImage" :src="captchaImage" alt="点击刷新验证码" />
+              <span v-if="captchaImage && captchaExpired" class="captcha-overlay">
+                点击刷新
+              </span>
               <RefreshCw v-else :size="20" />
             </button>
           </div>

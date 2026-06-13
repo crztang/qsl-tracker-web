@@ -6,6 +6,7 @@ export function useCaptcha(scene: 'login' | 'register') {
   const captchaCode = ref('')
   const captchaImage = ref('')
   const captchaLoading = ref(false)
+  const captchaExpired = ref(false)
   let expiryTimer: ReturnType<typeof globalThis.setTimeout> | null = null
 
   function clearExpiryTimer() {
@@ -18,10 +19,13 @@ export function useCaptcha(scene: 'login' | 'register') {
   function scheduleExpiry(expiresInSeconds: number) {
     clearExpiryTimer()
     if (expiresInSeconds <= 0) {
+      captchaExpired.value = true
       return
     }
+    captchaExpired.value = false
     expiryTimer = globalThis.setTimeout(() => {
-      void refreshCaptcha()
+      captchaExpired.value = true
+      expiryTimer = null
     }, expiresInSeconds * 1000)
   }
 
@@ -49,6 +53,7 @@ export function useCaptcha(scene: 'login' | 'register') {
     captchaCode,
     captchaImage,
     captchaLoading,
+    captchaExpired,
     refreshCaptcha
   }
 }

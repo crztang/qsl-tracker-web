@@ -18,10 +18,12 @@ const {
   captchaCode,
   captchaImage,
   captchaLoading,
+  captchaExpired,
   refreshCaptcha
 } = useCaptcha('register')
 
 const isUsernameAllowed = (value: string) => /^[A-Za-z0-9]+$/.test(value)
+const isPasswordAllowed = (value: string) => !/^\d+$/.test(value)
 
 const usernameRules = computed(() => [
   {
@@ -36,16 +38,12 @@ const usernameRules = computed(() => [
 
 const passwordRules = computed(() => [
   {
-    label: '不能少于6位',
+    label: '不少于6位',
     ok: form.password.length >= 6 && form.password.length <= 64
   },
   {
-    label: '必须包含字母',
-    ok: /[A-Za-z]/.test(form.password)
-  },
-  {
-    label: '必须包含数字',
-    ok: /\d/.test(form.password)
+    label: '不能为纯数字',
+    ok: isPasswordAllowed(form.password)
   }
 ])
 
@@ -57,6 +55,10 @@ const canSubmit = computed(() => {
 
 async function submit() {
   error.value = ''
+  if (!captchaId.value || captchaExpired.value) {
+    error.value = '请先获取验证码'
+    return
+  }
   if (!usernameRules.value.every((rule) => rule.ok)) {
     error.value = '请先完成用户名规则'
     return
@@ -92,7 +94,6 @@ async function submit() {
   <main class="login-page">
     <section class="login-card">
       <h1>创建账号</h1>
-      <p class="muted">注册后返回登录页自行登录</p>
       <form class="login-form" @submit.prevent="submit">
         <label class="field">
           <span>用户名</span>
@@ -169,8 +170,18 @@ async function submit() {
               placeholder="请输入验证码"
               required
             />
-            <button class="captcha-image" type="button" :disabled="captchaLoading" @click="refreshCaptcha">
+            <button
+              class="captcha-image"
+              :class="{ 'captcha-image--expired': captchaExpired }"
+              type="button"
+              :disabled="captchaLoading"
+              :aria-label="captchaExpired ? '点击刷新' : '点击刷新'"
+              @click="refreshCaptcha"
+            >
               <img v-if="captchaImage" :src="captchaImage" alt="点击刷新验证码" />
+              <span v-if="captchaImage && captchaExpired" class="captcha-overlay">
+                点击刷新
+              </span>
               <RefreshCw v-else :size="20" />
             </button>
           </div>
