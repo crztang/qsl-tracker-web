@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, Link2, Power, RefreshCcw, Save } from 'lucide-vue-next'
+import { Copy, Link2, Power, RefreshCcw, Save, X } from 'lucide-vue-next'
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   generateQslShare,
@@ -11,7 +11,6 @@ import {
 import type {
   QslShareExpiryPreset,
   QslShareIssue,
-  QslShareRequest,
   QslShareSummary,
   UserProfilePayload
 } from '@/api/types'
@@ -32,6 +31,9 @@ const generatedToken = ref('')
 const generatedEmbedUrl = ref('')
 const generatedIframeCode = ref('')
 const shareSummary = ref<QslShareSummary | null>(null)
+const previewVisible = ref(false)
+const revokeConfirmVisible = ref(false)
+
 const form = reactive<UserProfilePayload>({
   callSign: '',
   email: '',
@@ -40,16 +42,17 @@ const form = reactive<UserProfilePayload>({
   recipient: '',
   postalCode: ''
 })
-const shareForm = reactive<QslShareRequest>({
+
+const shareForm = reactive({
   recordLimit: 10,
-  expiryPreset: '7d',
-  enabled: true
+  expiryPreset: '7d' as Exclude<QslShareExpiryPreset, 'custom'>
 })
+
+const hasShareLink = computed(() => Boolean(generatedToken.value && generatedEmbedUrl.value && generatedIframeCode.value))
 
 const shareStatusText = computed(() => {
   if (!shareSummary.value) return '尚未生成嵌入链接'
-  if (!shareSummary.value.hasToken) return '设置已保存，但尚未生成链接'
-  if (!shareSummary.value.enabled) return '当前嵌入链接已停用'
+  if (!shareSummary.value.hasToken) return '尚未生成嵌入链接'
   if (shareSummary.value.expired) return '当前嵌入链接已过期'
   return '当前嵌入链接可用'
 })
@@ -59,6 +62,19 @@ const shareExpiryText = computed(() => {
   if (!shareSummary.value.expiresAt) return '永久有效'
   return shareSummary.value.expiresAt.replace('T', ' ').slice(0, 16)
 })
+
+function applyShareSnapshot(payload: QslShareSummary | QslShareIssue | null) {
+  shareSummary.value = payload
+  if (payload?.token && payload.embedUrl && payload.iframeCode) {
+    generatedToken.value = payload.token
+    generatedEmbedUrl.value = payload.embedUrl
+    generatedIframeCode.value = payload.iframeCode
+    return
+  }
+  generatedToken.value = ''
+  generatedEmbedUrl.value = ''
+  generatedIframeCode.value = ''
+}
 
 async function loadProfile() {
   loading.value = true
@@ -76,13 +92,15 @@ async function loadProfile() {
       postalCode: profile.postalCode || ''
     })
 
-    shareSummary.value = profile.qslShare || null
+    applyShareSnapshot(profile.qslShare || null)
     if (profile.qslShare) {
       shareForm.recordLimit = profile.qslShare.recordLimit || 10
       shareForm.expiryPreset = profile.qslShare.expiryPreset === 'custom'
         ? '7d'
         : (profile.qslShare.expiryPreset as Exclude<QslShareExpiryPreset, 'custom'>)
-      shareForm.enabled = profile.qslShare.enabled
+    } else {
+      shareForm.recordLimit = 10
+      shareForm.expiryPreset = '7d'
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '个人资料加载失败'
@@ -106,10 +124,11 @@ async function submitProfile() {
 }
 
 async function saveShareSettings() {
+  if (!hasShareLink.value) return
   shareSaving.value = true
   error.value = ''
   try {
-    shareSummary.value = await updateQslShare({ ...shareForm })
+    applyShareSnapshot(await updateQslShare({ ...shareForm }))
     successMessage.value = '嵌入分享设置已保存'
     window.setTimeout(() => (successMessage.value = ''), 1800)
   } catch (err) {
@@ -119,25 +138,17 @@ async function saveShareSettings() {
   }
 }
 
-function applyIssuedShare(payload: QslShareIssue) {
-  shareSummary.value = payload
-  shareForm.recordLimit = payload.recordLimit
-  shareForm.expiryPreset = payload.expiryPreset === 'custom'
-    ? '7d'
-    : (payload.expiryPreset as Exclude<QslShareExpiryPreset, 'custom'>)
-  shareForm.enabled = payload.enabled
-  generatedToken.value = payload.token
-  generatedEmbedUrl.value = payload.embedUrl
-  generatedIframeCode.value = payload.iframeCode
-}
-
 async function generateShare() {
   shareGenerating.value = true
   error.value = ''
   try {
-    const payload = await generateQslShare({ ...shareForm, enabled: true })
-    applyIssuedShare(payload)
-    successMessage.value = '嵌入链接已生成，可直接复制'
+    const payload = await generateQslShare({ ...shareForm })
+    applyShareSnapshot(payload)
+    shareForm.recordLimit = payload.recordLimit
+    shareForm.expiryPreset = payload.expiryPreset === 'custom'
+      ? '7d'
+      : (payload.expiryPreset as Exclude<QslShareExpiryPreset, 'custom'>)
+    successMessage.value = '嵌入链接已生成'
     window.setTimeout(() => (successMessage.value = ''), 1800)
   } catch (err) {
     error.value = err instanceof Error ? err.message : '嵌入链接生成失败'
@@ -150,15 +161,12 @@ async function revokeShare() {
   shareRevoking.value = true
   error.value = ''
   try {
-    shareSummary.value = await revokeQslShare()
-    shareForm.enabled = false
-    generatedToken.value = ''
-    generatedEmbedUrl.value = ''
-    generatedIframeCode.value = ''
-    successMessage.value = '嵌入链接已停用'
+    applyShareSnapshot(await revokeQslShare())
+    revokeConfirmVisible.value = false
+    successMessage.value = '嵌入链接已取消'
     window.setTimeout(() => (successMessage.value = ''), 1800)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '嵌入链接停用失败'
+    error.value = err instanceof Error ? err.message : '嵌入链接取消失败'
   } finally {
     shareRevoking.value = false
   }
@@ -175,8 +183,22 @@ async function copyText(text: string, label: string) {
   }
 }
 
-function hasGeneratedCode() {
-  return Boolean(generatedToken.value && generatedEmbedUrl.value && generatedIframeCode.value)
+function openPreview() {
+  if (!hasShareLink.value) return
+  previewVisible.value = true
+}
+
+function closePreview() {
+  previewVisible.value = false
+}
+
+function askRevoke() {
+  if (!hasShareLink.value) return
+  revokeConfirmVisible.value = true
+}
+
+function closeRevokeConfirm() {
+  revokeConfirmVisible.value = false
 }
 
 onMounted(loadProfile)
@@ -246,14 +268,14 @@ onMounted(loadProfile)
           <p>生成一个可直接嵌入其他网站的只读通联记录页面。</p>
         </div>
 
-        <div class="share-status" :data-active="shareSummary?.enabled && !shareSummary?.expired && shareSummary?.hasToken">
+        <div class="share-status" :data-active="hasShareLink">
           <div class="share-status-main">
             <strong>{{ shareStatusText }}</strong>
             <span>记录条数：{{ shareSummary?.recordLimit ?? shareForm.recordLimit }}</span>
           </div>
           <div class="share-status-meta">
             <span>有效期：{{ shareExpiryText }}</span>
-            <span>状态：{{ shareSummary?.enabled ? '启用' : '停用' }}</span>
+            <span>状态：{{ hasShareLink ? '启用' : '未生成' }}</span>
           </div>
         </div>
 
@@ -271,43 +293,52 @@ onMounted(loadProfile)
               <option value="30d">30 天</option>
             </select>
           </label>
-          <label class="field toggle-field full">
-            <input v-model="shareForm.enabled" type="checkbox" />
-            <span>生成后保持启用</span>
-          </label>
         </div>
 
         <div class="share-actions">
           <button
+            v-if="!hasShareLink"
             class="button"
             type="button"
             :disabled="shareGenerating || loading"
             @click="generateShare"
           >
             <RefreshCcw :size="18" />
-            <span>{{ hasGeneratedCode() ? '重新生成链接' : '生成链接' }}</span>
+            <span>生成链接</span>
           </button>
-          <button
-            class="button secondary"
-            type="button"
-            :disabled="shareSaving || loading"
-            @click="saveShareSettings"
-          >
-            <Save :size="18" />
-            <span>{{ shareSaving ? '保存中' : '保存设置' }}</span>
-          </button>
-          <button
-            class="button danger"
-            type="button"
-            :disabled="shareRevoking || loading || !shareSummary?.enabled"
-            @click="revokeShare"
-          >
-            <Power :size="18" />
-            <span>{{ shareRevoking ? '停用中' : '停用链接' }}</span>
-          </button>
+
+          <template v-else>
+            <button
+              class="button secondary"
+              type="button"
+              :disabled="shareSaving || loading"
+              @click="saveShareSettings"
+            >
+              <Save :size="18" />
+              <span>{{ shareSaving ? '保存中' : '保存设置' }}</span>
+            </button>
+            <button
+              class="button secondary"
+              type="button"
+              :disabled="!hasShareLink"
+              @click="openPreview"
+            >
+              <Link2 :size="18" />
+              <span>预览</span>
+            </button>
+            <button
+              class="button danger"
+              type="button"
+              :disabled="shareRevoking || loading"
+              @click="askRevoke"
+            >
+              <Power :size="18" />
+              <span>{{ shareRevoking ? '取消中' : '取消分享' }}</span>
+            </button>
+          </template>
         </div>
 
-        <div v-if="hasGeneratedCode()" class="code-blocks">
+        <div v-if="hasShareLink" class="code-blocks">
           <label class="field full">
             <span>分享链接</span>
             <div class="copy-row">
@@ -322,7 +353,7 @@ onMounted(loadProfile)
             <div class="copy-stack">
               <textarea :value="generatedIframeCode" class="textarea code-area" readonly />
               <button class="button secondary copy-button" type="button" @click="copyText(generatedIframeCode, 'iframe 代码')">
-                <Link2 :size="18" />
+                <Copy :size="18" />
                 <span>复制 iframe 代码</span>
               </button>
             </div>
@@ -330,10 +361,58 @@ onMounted(loadProfile)
         </div>
 
         <p v-else class="share-hint">
-          当前没有可复制的 iframe 代码。请先生成一次链接；重新打开页面后如需再次复制，可再次生成。
+          先生成一次链接，之后刷新页面也会保留，方便继续复制分享。
         </p>
       </section>
     </div>
+
+    <Teleport to="body">
+      <div v-if="previewVisible" class="modal-backdrop" @click.self="closePreview">
+        <section class="modal-card preview-card" role="dialog" aria-modal="true" aria-label="预览当前 iframe 效果">
+          <header class="modal-header">
+            <div>
+              <h3>预览当前 iframe 效果</h3>
+              <p>以下内容就是其他网站嵌入后看到的页面。</p>
+            </div>
+            <button class="icon-button modal-close" type="button" aria-label="关闭预览" @click="closePreview">
+              <X :size="16" />
+            </button>
+          </header>
+          <div class="preview-frame-wrap">
+            <iframe
+              v-if="generatedEmbedUrl"
+              :src="generatedEmbedUrl"
+              class="preview-frame"
+              title="通联记录预览"
+              loading="lazy"
+            />
+          </div>
+        </section>
+      </div>
+
+      <div v-if="revokeConfirmVisible" class="modal-backdrop" @click.self="closeRevokeConfirm">
+        <section class="modal-card confirm-card" role="dialog" aria-modal="true" aria-label="确认取消分享">
+          <header class="modal-header">
+            <div>
+              <h3>取消分享</h3>
+              <p>取消后会删除当前分享记录，链接将立即失效。</p>
+            </div>
+            <button class="icon-button modal-close" type="button" aria-label="关闭确认框" @click="closeRevokeConfirm">
+              <X :size="16" />
+            </button>
+          </header>
+          <div class="confirm-actions">
+            <button class="button secondary" type="button" :disabled="shareRevoking" @click="closeRevokeConfirm">
+              取消
+            </button>
+            <button class="button danger" type="button" :disabled="shareRevoking" @click="revokeShare">
+              <Power :size="18" />
+              <span>{{ shareRevoking ? '取消中' : '确认取消' }}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </AppShell>
 </template>
 
@@ -404,7 +483,7 @@ onMounted(loadProfile)
   background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
 }
 
-.share-status[data-active="true"] {
+.share-status[data-active='true'] {
   border-color: #bbf7d0;
   background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
 }
@@ -426,14 +505,6 @@ onMounted(loadProfile)
 .share-status-main span,
 .share-status-meta span {
   color: #6b7280;
-}
-
-.toggle-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 4px;
 }
 
 .code-blocks {
@@ -475,6 +546,78 @@ onMounted(loadProfile)
   line-height: 1.5;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.modal-card {
+  width: min(100%, 1060px);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: #fff;
+  box-shadow: 0 40px 80px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.preview-card {
+  display: grid;
+}
+
+.confirm-card {
+  width: min(100%, 560px);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.modal-close {
+  flex: 0 0 auto;
+}
+
+.preview-frame-wrap {
+  min-height: min(72vh, 760px);
+  background: #f8fafc;
+}
+
+.preview-frame {
+  display: block;
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #fff;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+}
+
 @media (max-width: 1080px) {
   .profile-layout {
     grid-template-columns: 1fr;
@@ -488,12 +631,14 @@ onMounted(loadProfile)
   }
 
   .profile-actions,
-  .share-actions {
+  .share-actions,
+  .confirm-actions {
     justify-content: stretch;
   }
 
   .profile-actions .button,
-  .share-actions .button {
+  .share-actions .button,
+  .confirm-actions .button {
     width: 100%;
   }
 
@@ -503,6 +648,14 @@ onMounted(loadProfile)
 
   .icon-button {
     width: 100%;
+  }
+
+  .modal-card {
+    width: 100%;
+  }
+
+  .modal-header {
+    flex-direction: column;
   }
 }
 </style>

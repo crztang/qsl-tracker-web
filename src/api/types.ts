@@ -85,6 +85,9 @@ export interface QslShareSummary {
   updatedAt?: string
   expired: boolean
   hasToken: boolean
+  token?: string
+  embedUrl?: string
+  iframeCode?: string
 }
 
 export interface QslShareIssue extends QslShareSummary {

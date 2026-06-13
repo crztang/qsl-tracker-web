@@ -233,6 +233,79 @@ a {
   background: #dc2626;
 }
 
+.modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 3000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  background: rgba(15, 23, 42, 0.62) !important;
+}
+
+.modal-card {
+  width: min(100%, 1060px) !important;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: #ffffff;
+  box-shadow: 0 40px 80px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.preview-card {
+  display: grid;
+}
+
+.confirm-card {
+  width: min(100%, 560px) !important;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.modal-close {
+  flex: 0 0 auto;
+}
+
+.preview-frame-wrap {
+  min-height: min(72vh, 760px);
+  background: #f8fafc;
+}
+
+.preview-frame {
+  display: block;
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #ffffff;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
