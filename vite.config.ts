@@ -15,6 +15,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:10010',
         changeOrigin: true
+      },
+      '/public/embed': {
+        target: 'http://localhost:10010',
+        changeOrigin: true
       }
     }
   }

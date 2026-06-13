@@ -56,6 +56,7 @@ export interface UserProfile {
   phone?: string
   recipient?: string
   postalCode?: string
+  qslShare?: QslShareSummary
 }
 
 export interface UserProfilePayload {
@@ -65,6 +66,31 @@ export interface UserProfilePayload {
   phone?: string
   recipient?: string
   postalCode?: string
+}
+
+export type QslShareExpiryPreset = 'permanent' | '1d' | '7d' | '30d' | 'custom'
+
+export interface QslShareRequest {
+  recordLimit?: number
+  expiryPreset?: Exclude<QslShareExpiryPreset, 'custom'>
+  enabled?: boolean
+}
+
+export interface QslShareSummary {
+  enabled: boolean
+  recordLimit: number
+  expiryPreset: QslShareExpiryPreset
+  expiresAt?: string
+  createdAt?: string
+  updatedAt?: string
+  expired: boolean
+  hasToken: boolean
+}
+
+export interface QslShareIssue extends QslShareSummary {
+  token: string
+  embedUrl: string
+  iframeCode: string
 }
 
 export interface QsoLog {
