@@ -1,4 +1,4 @@
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { getCaptcha } from '@/api/auth'
 
 export function useCaptcha(scene: 'login' | 'register') {
@@ -6,21 +6,43 @@ export function useCaptcha(scene: 'login' | 'register') {
   const captchaCode = ref('')
   const captchaImage = ref('')
   const captchaLoading = ref(false)
+  let expiryTimer: ReturnType<typeof globalThis.setTimeout> | null = null
+
+  function clearExpiryTimer() {
+    if (expiryTimer !== null) {
+      clearTimeout(expiryTimer)
+      expiryTimer = null
+    }
+  }
+
+  function scheduleExpiry(expiresInSeconds: number) {
+    clearExpiryTimer()
+    if (expiresInSeconds <= 0) {
+      return
+    }
+    expiryTimer = globalThis.setTimeout(() => {
+      void refreshCaptcha()
+    }, expiresInSeconds * 1000)
+  }
 
   async function refreshCaptcha() {
     if (captchaLoading.value) return
     captchaLoading.value = true
     captchaCode.value = ''
+    captchaId.value = ''
+    captchaImage.value = ''
     try {
       const data = await getCaptcha(scene)
       captchaId.value = data.captchaId
       captchaImage.value = data.captchaImage
+      scheduleExpiry(data.expiresIn)
     } finally {
       captchaLoading.value = false
     }
   }
 
   onMounted(refreshCaptcha)
+  onBeforeUnmount(clearExpiryTimer)
 
   return {
     captchaId,

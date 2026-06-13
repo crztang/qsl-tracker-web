@@ -63,7 +63,7 @@ async function submit() {
               class="input"
               inputmode="numeric"
               autocomplete="off"
-              placeholder="请输入计算结果"
+              placeholder="请输入验证码"
               required
             />
             <button class="captcha-image" type="button" :disabled="captchaLoading" @click="refreshCaptcha">

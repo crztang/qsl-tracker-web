@@ -21,7 +21,7 @@ const {
   refreshCaptcha
 } = useCaptcha('register')
 
-const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value)
+const isUsernameAllowed = (value: string) => /^[A-Za-z0-9]+$/.test(value)
 
 const usernameRules = computed(() => [
   {
@@ -29,22 +29,22 @@ const usernameRules = computed(() => [
     ok: form.username.trim().length >= 5
   },
   {
-    label: '用户名不能包含中文',
-    ok: !hasChinese(form.username.trim())
+    label: '用户名只能包含英文字母和数字',
+    ok: isUsernameAllowed(form.username.trim())
   }
 ])
 
 const passwordRules = computed(() => [
   {
-    label: '密码长度为 8-64 位',
-    ok: form.password.length >= 8 && form.password.length <= 64
+    label: '不能少于6位',
+    ok: form.password.length >= 6 && form.password.length <= 64
   },
   {
-    label: '密码必须包含字母',
+    label: '必须包含字母',
     ok: /[A-Za-z]/.test(form.password)
   },
   {
-    label: '密码必须包含数字',
+    label: '必须包含数字',
     ok: /\d/.test(form.password)
   }
 ])
@@ -101,6 +101,7 @@ async function submit() {
             class="input"
             minlength="5"
             maxlength="64"
+            pattern="[A-Za-z0-9]+"
             autocomplete="username"
             required
           />
@@ -123,12 +124,12 @@ async function submit() {
             v-model="form.password"
             class="input"
             type="password"
-            minlength="8"
+            minlength="6"
             maxlength="64"
             autocomplete="new-password"
             required
           />
-          <p class="form-hint">密码需要同时满足以下 3 项：</p>
+          <p class="form-hint">密码要求：</p>
           <ul class="rule-list">
             <li
               v-for="rule in passwordRules"
@@ -148,7 +149,7 @@ async function submit() {
             v-model="form.confirmPassword"
             class="input"
             type="password"
-            minlength="8"
+            minlength="6"
             maxlength="64"
             autocomplete="new-password"
             required
